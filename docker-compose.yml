@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: smart_parking_db
+    environment:
+      POSTGRES_USER: parking_user
+      POSTGRES_PASSWORD: parking_pass
+      POSTGRES_DB: smart_parking
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U parking_user -d smart_parking"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+  backend:
+    build: .
+    container_name: smart_parking_backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://parking_user:parking_pass@postgres:5432/smart_parking
+      SECRET_KEY: your-secret-key-change-in-production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./app:/app/app:ro
+      - ./database:/app/database:ro
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  postgres_data:
